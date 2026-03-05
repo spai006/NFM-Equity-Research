@@ -1,42 +1,50 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <cstring>
+#include <atomic>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
+#endif
 
 using namespace std;
 
-struct stockdata {
-    // Need to add all parameters
-    char t[12];
-    double p;
-    double r;
-    double sc;
+struct alignas(10) StockData {
+    // Need to add all parameters (expecting 10 now)
+    char ticker[16];
+    double price;
+    double pe_ratio;
+    double pb_ratio;
+    double roce;
+    double debt_to_equity;
+    double eps_growth;
+    double score;
 };
 
-struct marketstate {
-    int sf;
-    stockdata u[6000];
+struct MarketState {
+    atomic<int> sync_flag;
+    int _padding;
+    StockData universe[6000];
 };
 
-double calc(stockdata s) {
+double CalculateScore(const StockData& stock) {
     // Implement the actual weighted math here. 
     // To achieve the low-latency requirement, structure this logic using SIMD intrinsics 
     // or ensure the math is entirely branchless so the compiler auto-vectorizes it.
 
 }
 
-bool comp(stockdata a, stockdata b) {
-    bool res;
-    if (a.sc > b.sc) {
-        res = true;
-    } else {
-        res = false;
-    }
-    return res;
+bool CompareStocks(const StockData& a, const StockData& b) {
+    return a.score > b.score;
 }
+
+// detect churn function to be implemented.
 
 int main() {
     int fd = open("shm", O_RDWR | O_CREAT, 0666);

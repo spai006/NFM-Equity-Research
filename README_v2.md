@@ -1,8 +1,8 @@
 # 📈 NFM Equity Research Platform (v2)
 
-NFM‑Equity‑Research is a research‑focused equity analysis platform that uses a New Fundamental Model (NFM) combined with LLM‑based reasoning to identify, rank, and continuously monitor the fundamentally strongest companies in the Indian stock market.
+NFM‑Equity‑Research is a quantitative stock-ranking engine and research-focused equity analysis platform that uses a New Fundamental Model (NFM) combined with LLM‑based reasoning to identify, rank, and continuously monitor the fundamentally strongest companies in the Indian stock market.
 
-The system evaluates ~6,000 listed Indian companies using multi‑factor fundamental data, selects the Top 50 companies, generates explainable research justifications, and dynamically updates the list as business fundamentals evolve.
+The scalable research pipeline evaluates thousands of listed Indian equities (scoring 500+ NSE equities across 10+ weighted fundamental parameters). It features a live state-management system that auto-triggers churn alerts on regime shifts, selects the Top 50 companies, generates explainable investment insights, and dynamically updates the list as business fundamentals evolve.
 
 > ⚠️ **Disclaimer:** This is a research and decision-support system. It does NOT guarantee returns. It aims to maximize probability of strong investments through systematic analysis.
 
@@ -14,9 +14,9 @@ Version 2 introduces a more realistic and scalable design, pivoting from the pro
 
 ### Why the Pivot?
 The pivot was driven by the need for:
-- **Performance:** Moving from slow, sequential processing to optimized batch processing.
-- **Realism:** Implementing churn and monitoring logic that mimics actual institutional workflows.
-- **Scalability:** Ensuring the architecture can handle the entire NSE/BSE universe without bottlenecks.
+- **Low-Latency Execution:** Engineering a low-latency C++ execution core with Shared Memory, Ring Buffers, SIMD vectorisation, and custom Object Pools to handle high-frequency data ingestion with minimal overhead and latency.
+- **Live State-Management:** Implementing a live state-management system that auto-triggers churn alerts on regime shifts, mimicking actual institutional workflows.
+- **Scalable Research Pipeline:** Ensuring the architecture can analyze thousands of listed Indian equities through automated feature engineering, ranking, and continuous monitoring workflows.
 
 ### 📜 Legacy Version 1
 All original modules and prototypes have been moved to:
@@ -38,21 +38,21 @@ These files are retained for historical reference and audit purposes but are for
 
 ## 🧠 High-Level Architecture
 ```text
-Market Universe (~6000 Stocks)
+Market Universe (Thousands of Indian Equities)
         ↓
-Fundamental Data Ingestion
+High-Frequency Data Ingestion (Low-Latency C++ Core)
         ↓
-Feature Engineering (40+ Metrics)
+Automated Feature Engineering (10+ Fundamental Parameters)
         ↓
-NFM Weighted Scoring Engine
+Quantitative Stock-Ranking Engine
         ↓
 Top 50 Stock Selection
         ↓
-LLM‑Based Research Explanations
+LLM‑Based Explainable Investment Insights
         ↓
-Continuous Monitoring & Alerts
+Live State-Management & Continuous Monitoring
         ↓
-Automated Churn (Add/Remove)
+Automated Churn Alerts (Regime Shifts)
 ```
 
 ---

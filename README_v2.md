@@ -1,6 +1,6 @@
 # 📈 NFM Equity Research Platform (v2)
 
-NFM‑Equity‑Research is a quantitative stock-ranking engine and research-focused equity analysis platform that uses a New Fundamental Model (NFM) combined with LLM‑based reasoning to identify, rank, and continuously monitor the fundamentally strongest companies in the Indian stock market.
+NFM‑Equity‑Research is a quantitative stock-ranking engine and research-focused equity analysis platform that uses a New Fundamental Model (NFM) to identify, rank, and continuously monitor the fundamentally strongest companies in the Indian stock market.
 
 The scalable research pipeline evaluates thousands of listed Indian equities (scoring 500+ NSE equities across 10+ weighted fundamental parameters). It features a live state-management system that auto-triggers churn alerts on regime shifts, selects the Top 50 companies, generates explainable investment insights, and dynamically updates the list as business fundamentals evolve.
 
@@ -14,7 +14,7 @@ Version 2 introduces a more realistic and scalable design, pivoting from the pro
 
 ### Why the Pivot?
 The pivot was driven by the need for:
-- **Low-Latency Execution:** Engineering a low-latency C++ execution core with Shared Memory, Ring Buffers, SIMD vectorisation, and custom Object Pools to handle high-frequency data ingestion with minimal overhead and latency.
+- **Hybrid Performance & Low-Latency Execution:** Engineering a hybrid architecture where Python handles data ingestion, processing, and cleaning, writing directly to Memory-Mapped Shared Memory. A low-latency C++ execution core reads from this shared memory to perform quantitative scoring and return results instantly, ensuring minimal overhead.
 - **Live State-Management:** Implementing a live state-management system that auto-triggers churn alerts on regime shifts, mimicking actual institutional workflows.
 - **Scalable Research Pipeline:** Ensuring the architecture can analyze thousands of listed Indian equities through automated feature engineering, ranking, and continuous monitoring workflows.
 
@@ -29,7 +29,7 @@ These files are retained for historical reference and audit purposes but are for
 ## 🎯 Objectives
 - **Build a scalable fundamentals-driven equity screening engine**
 - **Rank Indian equities** using a weighted NFM model
-- **Generate human-readable reasoning** using LLMs
+- **Generate explainable investment insights** via quantitative scoring attribution
 - **Monitor deterioration signals** and trigger early warnings
 - **Maintain a dynamic Top 50 list** via automated churn logic
 - **Provide transparent and explainable scoring**
@@ -40,15 +40,15 @@ These files are retained for historical reference and audit purposes but are for
 ```text
 Market Universe (Thousands of Indian Equities)
         ↓
-High-Frequency Data Ingestion (Low-Latency C++ Core)
+Data Ingestion, Processing & Cleaning (Python)
         ↓
-Automated Feature Engineering (10+ Fundamental Parameters)
+Memory-Mapped Shared Memory (IPC)
         ↓
-Quantitative Stock-Ranking Engine
+Quantitative Stock-Ranking & Scoring Engine (Low-Latency C++)
         ↓
 Top 50 Stock Selection
         ↓
-LLM‑Based Explainable Investment Insights
+Factor Attribution & Explainable Investment Insights
         ↓
 Live State-Management & Continuous Monitoring
         ↓
@@ -66,7 +66,7 @@ NFM-Equity-Research/
 │   ├── metrics/            # Fundamental metrics & feature engineering
 │   ├── scoring/            # NFM scoring & ranking logic
 │   ├── monitoring/         # Alerts & deterioration tracking
-│   ├── llm_reasoning/      # Prompting & explanation generation
+│   ├── attribution/        # Factor attribution & explainability logic
 │   ├── pipeline/           # Pipeline orchestration
 │   └── validation/         # Data validation checks
 │
@@ -102,7 +102,7 @@ python pipeline_run.py
 2. Metric computation
 3. NFM scoring & ranking
 4. Top 50 selection
-5. LLM explanation generation
+5. Factor attribution generation
 6. Monitoring & churn updates
 7. Report generation
 

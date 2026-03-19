@@ -11,3 +11,8 @@ venv/
 
 # MacOS
 .DS_Store
+a.out
+consumer
+**/*.csv
+__pycache__/
+.venv/

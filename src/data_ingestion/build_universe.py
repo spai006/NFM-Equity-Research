@@ -9,15 +9,14 @@ UNIVERSE_FILE = Path("data/universe_master.csv")
 def generate_universe_csv():
     print("Fetching master equity list from NSE...")
     
-    # nselib does not have a native nifty500 API. 
-    # We fetch the entire NSE master list (~2,000+ stocks) instead
-    df = capital_market.equity_list()
+    # We fetch the Nifty 50 list
+    df = capital_market.nifty50_equity_list()
     
     # Handle column name variations from NSE
     col_name = 'SYMBOL' if 'SYMBOL' in df.columns else 'Symbol'
 
-    # Slice strictly the first 500 to exactly match the C++ Memory Map size
-    tickers = df[col_name].dropna().tolist()[:500]
+    # Slice strictly the first 50 to exactly match the C++ Memory Map size
+    tickers = df[col_name].dropna().tolist()[:50]
     
     # Create the data directory if it doesn't exist
     UNIVERSE_FILE.parent.mkdir(parents=True, exist_ok=True)

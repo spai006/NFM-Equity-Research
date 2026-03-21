@@ -15,8 +15,8 @@ struct Record {
 struct SharedBlock {
   uint32_t count; // 4 bytes
 
-  Record records[500]; // 500*84 = 42000 bytes
-                       // total size = 42004 bytes
+  Record records[50]; // 50*84 = 4200 bytes
+                      // total size = 4204 bytes
 };
 
 #pragma pack(pop)

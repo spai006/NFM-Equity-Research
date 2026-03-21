@@ -1,17 +1,21 @@
-// open /tmp/marker_state.bin using open() and mmap()
+// open market_state.bin using platform specific memory mapping
 #include "shared_memory.h"
 #include <algorithm>
-#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
+#include <vector>
+#include <chrono>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <unordered_map>
-#include <vector>
-
-#include <chrono>
+#endif
 
 std::unordered_map<int, std::string>
 load_universe(const std::string &filepath) {
@@ -47,33 +51,34 @@ int main() {
   // Load Ticker Map to translate C++ integers back to human names
   auto ticker_map = load_universe("data/universe_master.csv");
 
-  // Opening the exact file Python creates (fixed filename typo)
-  int fd = open("/tmp/market_state.bin", O_RDONLY); // O_RDONLY means read only
+  // Opening the exact file Python creates
+#ifdef _WIN32
+  HANDLE hFile = CreateFileA("market_state.bin", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (hFile != INVALID_HANDLE_VALUE) {
+    LARGE_INTEGER fileSize;
+    if (GetFileSizeEx(hFile, &fileSize)) {
+      HANDLE hMap = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+      if (hMap != NULL) {
+        void* addr = MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+        if (addr != NULL) {
+          SharedBlock *block = static_cast<SharedBlock *>(addr);
+          std::cout << "Consumer: Successfully mapped " << fileSize.QuadPart << " bytes.\n";
+#else
+  int fd = open("market_state.bin", O_RDONLY);
   if (fd != -1) {
-    struct stat sb; // built in c structure to hold metadata about a file
-    if (fstat(fd, &sb) != -1) { // fstat is used to get the size of the file
+    struct stat sb;
+    if (fstat(fd, &sb) != -1) {
       void *addr = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-      // sb.st_size is basically the size of the file in bytes
-      // PROT_READ means we are reading the file
-      // MAP_PRIVATE means we are not writing to the file
-      // fd is the file descriptor
-      // 0 is the offset
-      // addr is the memory address of the file
-
-      // MAP_FAILED is a special value that is returned when mmap fails
       if (addr != MAP_FAILED) {
-
-        // 1. Cast the raw memory pointer into our C++ Struct
         SharedBlock *block = static_cast<SharedBlock *>(addr);
-
-        std::cout << "Consumer: Successfully mapped " << sb.st_size << " bytes."
-                  << std::endl;
+        std::cout << "Consumer: Successfully mapped " << sb.st_size << " bytes.\n";
+#endif
         std::cout << "Consumer: Found " << block->count << " records."
                   << std::endl;
 
-        // 2. Define custom weights for scoring our NFM
-        double weights[10] = {0.1,  0.2, 0.5, -0.1, 0.3,
-                              -0.2, 0.4, 0.1, 0.2,  -0.3};
+        // 2. Define custom weights for scoring our NFM (Negative for P/E, PEG, and D/E)
+        double weights[10] = {-0.15, -0.15, 0.10, 0.10, 0.15,
+                              0.10, 0.10, 0.05, 0.05, -0.05};
 
         // Structure to store pair of stock_id, final score, and attribution
         // breakdown.
@@ -138,8 +143,9 @@ int main() {
         // 6. Write top 50 to reports/top50.csv
         std::ofstream outfile("reports/top50.csv");
         if (outfile.is_open()) {
-          outfile << "rank,ticker,score,mom_6m_contrib,mom_12m_contrib,vol_"
-                     "contrib,p2dma_contrib\n";
+          outfile << "rank,ticker,score,pe_contrib,peg_contrib,"
+                     "rev_1y_contrib,rev_10y_contrib,eps_grow_contrib,"
+                     "roe_contrib,roce_contrib,fcf_np_contrib,fcf_rev_contrib,de_contrib\n";
           for (int i = 0; i < std::min(50, (int)vector_scores.size()); ++i) {
             std::string ticker = "UNKNOWN";
             if (ticker_map.find(vector_scores[i].stock_id) !=
@@ -150,7 +156,13 @@ int main() {
                     << "," << vector_scores[i].contributions[0] << ","
                     << vector_scores[i].contributions[1] << ","
                     << vector_scores[i].contributions[2] << ","
-                    << vector_scores[i].contributions[3] << "\n";
+                    << vector_scores[i].contributions[3] << ","
+                    << vector_scores[i].contributions[4] << ","
+                    << vector_scores[i].contributions[5] << ","
+                    << vector_scores[i].contributions[6] << ","
+                    << vector_scores[i].contributions[7] << ","
+                    << vector_scores[i].contributions[8] << ","
+                    << vector_scores[i].contributions[9] << "\n";
           }
           outfile.close();
           std::cout << "\nSUCCESS: Exported top 50 ranked stocks to "
@@ -161,6 +173,18 @@ int main() {
                        "directory exist?"
                     << std::endl;
         }
+#ifdef _WIN32
+          UnmapViewOfFile(addr);
+        }
+        CloseHandle(hMap);
+      }
+    }
+    CloseHandle(hFile);
+  } else {
+    std::cerr << "Failed to open memory mapped file. Did you run Python first?"
+              << std::endl;
+  }
+#else
       }
     }
     close(fd);
@@ -168,6 +192,7 @@ int main() {
     std::cerr << "Failed to open memory mapped file. Did you run Python first?"
               << std::endl;
   }
+#endif
   auto t2 = std::chrono::high_resolution_clock::now();
 
   std::cout

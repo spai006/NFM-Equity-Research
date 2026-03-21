@@ -22,11 +22,11 @@ class SharedBlock(ctypes.Structure):
     _pack_ = 1  # Crucial to pack this as well
     _fields_ = [
         ("count", ctypes.c_uint32),             # 4 bytes
-        ("records", Record * 500)               # 500 * 84 = 42,000 bytes
+        ("records", Record * 50)                # 50 * 84 = 4200 bytes
     ]
 
 def main():
-    filename = "/tmp/market_state.bin" 
+    filename = "market_state.bin" 
     # this is a temporary file that will be deleted once the program is closed
     # it is used to store the shared memory
     # it is present in the /tmp directory which is a temporary file system that is mounted on RAM
@@ -56,15 +56,15 @@ def main():
         # bytes from mm as SharedBlock struct and create a python object from it
         block = SharedBlock.from_buffer(mm)
 
-        # 5. Populate 500 test data rows!
-        block.count = 500 
+        # 5. Populate 50 test data rows!
+        block.count = 50 
         
-        for i in range(500):
-            block.records[i].stock_id = 1000 + i # Dummy stock ID
+        for i in range(50):
+            block.records[i].stock_id = i # Stock ID matching universe_master.csv
             for j in range(10):
                 block.records[i].factors[j] = random.uniform(-1.0, 1.0)
         
-        print(f"Producer finished writing 500 factor rows.")
+        print(f"Producer finished writing 50 factor rows.")
         
         del block 
         mm.close()

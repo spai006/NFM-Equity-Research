@@ -13,7 +13,7 @@ start = time.perf_counter()
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from src.data_ingestion.universe import Universe
-from src.metrics.factors.momentum import compute_fundamental_factors
+from src.metrics.factors.core_factors import compute_fundamental_factors
 
 class Record(ctypes.Structure):
     _pack_ = 1

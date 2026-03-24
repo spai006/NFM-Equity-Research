@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cstdint>
 
 #pragma pack(push, 1)
@@ -13,10 +14,11 @@ struct Record {
 };
 
 struct SharedBlock {
-  uint32_t count; // 4 bytes
+  std::atomic<uint32_t> head; // python will increment this after writing
+  std::atomic<uint32_t> tail; // c++ will increment this after reading
 
-  Record records[50]; // 50*84 = 4200 bytes
-                      // total size = 4204 bytes
+  Record records[1024]; // 1024*84 = 86016 bytes
+                        // total size = 86020 bytes
 };
 
 #pragma pack(pop)

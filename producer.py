@@ -2,6 +2,7 @@ import mmap
 import os
 import ctypes # for defining the structure of the shared memory
 import random
+import time
 
 # So basically we are using ctypes.Structure to force oython to treat these variables exactly
 # like raw C data types (e.g. c_int32 = 4 bytes)
@@ -21,8 +22,9 @@ class Record(ctypes.Structure):
 class SharedBlock(ctypes.Structure):
     _pack_ = 1  # Crucial to pack this as well
     _fields_ = [
-        ("count", ctypes.c_uint32),             # 4 bytes
-        ("records", Record * 50)                # 50 * 84 = 4200 bytes
+        ("head", ctypes.c_uint32),              # 4 bytes
+        ("tail", ctypes.c_uint32),              # 4 bytes
+        ("records", Record * 1024)              # 1024 * 84 = 86016 bytes
     ]
 
 def main():
@@ -57,17 +59,35 @@ def main():
         block = SharedBlock.from_buffer(mm)
 
         # 5. Populate 50 test data rows!
-        block.count = 50 
-        
-        for i in range(50):
-            block.records[i].stock_id = i # Stock ID matching universe_master.csv
-            for j in range(10):
-                block.records[i].factors[j] = random.uniform(-1.0, 1.0)
-        
-        print(f"Producer finished writing 50 factor rows.")
+        block.head = 0
+        block.tail = 0
+
+        print("starting continuous data stream...press ctrl+c to stop")
+
+        try:
+            while True:
+                while((block.head-block.tail)%(2**32)>=1024):
+                    time.sleep(0.001) # wait for 1 ms
+                
+                # write data
+                idx = block.head % 1024
+
+                block.records[idx].stock_id = random.randint(0, 499)
+                for j in range(10):
+                    block.records[idx].factors[j] = random.uniform(-1.0, 1.0)
+
+                #atomically publish to the consumer by incrementing head
+                block.head = (block.head + 1) % (2**32)
+
+                #small sleep to simulate 100 updates per second
+
+                time.sleep(0.01)
+        except KeyboardInterrupt:
+            print("\nProducer stopped by user.")    
         
         del block 
         mm.close()
+        os.remove(filename)
 
 if __name__ == "__main__":
     main()

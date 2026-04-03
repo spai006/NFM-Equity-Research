@@ -8,7 +8,8 @@ from pathlib import Path
 # Connect to src modules
 sys.path.append(str(Path(__file__).resolve().parent))
 from src.data_ingestion.universe import Universe
-from src.metrics.factors.core_factors import compute_fundamental_factors
+import json
+import yfinance as yf
 
 # So basically we are using ctypes.Structure to force oython to treat these variables exactly
 # like raw C data types (e.g. c_int32 = 4 bytes)
@@ -76,27 +77,66 @@ def main():
         company_tickers = universe.all_tickers()[:50]
         print(f"Loaded {len(company_tickers)} tickers to stream continuously...press ctrl+c to stop")
 
+        # Load the daily fundamental cache from disk into fast RAM
+        cache_path = Path(__file__).resolve().parent / "data" / "fundamentals_cache.json"
+        print(f"\nLoading fundamental cache from {cache_path}...")
+        try:
+            with open(cache_path, "r") as f:
+                cache_dict = json.load(f)
+            print("✅ Cache loaded successfully!")
+        except Exception as e:
+            print(f"❌ Failed to load cache: {e}. Did you run daily_fundamental_cacher.py first?")
+            sys.exit(1)
+
+        print("🚀 Starting ultra-fast IPC stream...press ctrl+c to stop\n")
+
         try:
             while True:
+                # 1. ⚡ THE LIVE PULL: Bulk download 50 stocks simultaneously to save API delay
+                print("\nFetching Live Intraday Market Snapshots...")
+                yf_tickers = [t + ".NS" for t in company_tickers]
+                
+                import logging
+                logging.getLogger('yfinance').setLevel(logging.CRITICAL)
+                live_data = yf.download(yf_tickers, period="1d", interval="1m", progress=False)
+
                 # Iterate precisely through the tickers
                 for ticker in company_tickers:
                     # Wait for space in ring buffer
                     while((block.head - block.tail) % (2**32) >= 1024):
-                        time.sleep(0.001) # wait for 1 ms
+                        time.sleep(0.001) # wait for 1 ms for C++ to read from the ring buffer
                     
-                    # Fetch real live computation
+                    yf_ticker = ticker + ".NS"
+                    
+                    # Safely extract Live Price/Volume (or fallback if pre-market)
                     try:
-                        print(f"Fetching updates for {ticker}...")
-                        calculated_factors = compute_fundamental_factors(ticker)
+                        if not live_data.empty:
+                            live_price = float(live_data['Close'][yf_ticker].dropna().iloc[-1])
+                            live_volume = float(live_data['Volume'][yf_ticker].dropna().iloc[-1])
+                        else:
+                            live_price, live_volume = 0.0, 0.0
+                    except:
+                        live_price, live_volume = 0.0, 0.0
+                    
+                    # Read pre-computed factors directly from fast RAM cache
+                    try:
+                        cal_facts = cache_dict.get(ticker, [0.0] * 10)
                         
                         # write data
                         idx = block.head % 1024
                         block.records[idx].stock_id = universe.get_id(ticker)
                         
-                        for j in range(10):
-                            # Safe fallback in case of None logic internally
-                            val = calculated_factors[j]
-                            block.records[idx].factors[j] = val if val is not None else 0.0
+                        # 🧬 THE HYBRID PAYLOAD: The ultimate mix of Live + Fundamental
+                        block.records[idx].factors[0] = live_price
+                        block.records[idx].factors[1] = live_volume / 1000.0  # Scaled volume
+                        block.records[idx].factors[2] = cal_facts[0]          # PE Ratio
+                        block.records[idx].factors[3] = cal_facts[1]          # PEG Ratio
+                        block.records[idx].factors[4] = cal_facts[2]          # Revenue Growth
+                        block.records[idx].factors[5] = cal_facts[4]          # EPS Growth
+                        block.records[idx].factors[6] = cal_facts[5]          # ROE
+                        block.records[idx].factors[7] = cal_facts[6]          # ROCE
+                        block.records[idx].factors[8] = cal_facts[7]          # FCF/NP
+                        block.records[idx].factors[9] = cal_facts[9]          # Debt/Equity
 
                         # atomically publish to the consumer by incrementing head
                         block.head = (block.head + 1) % (2**32)
@@ -104,8 +144,8 @@ def main():
                     except Exception as e:
                         print(f"Failed pulling variables for {ticker}: {e}")
 
-                    # Respectful rate limiting so APIs don't permanently ban our IP 
-                    time.sleep(2.0)
+                # API Safety Delay (Mid-Frequency tick rate)
+                time.sleep(5.0)
 
         except KeyboardInterrupt:
             print("\nProducer stopped by user.")    

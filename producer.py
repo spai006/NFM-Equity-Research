@@ -1,8 +1,14 @@
 import mmap
 import os
 import ctypes # for defining the structure of the shared memory
-import random
 import time
+import sys
+from pathlib import Path
+
+# Connect to src modules
+sys.path.append(str(Path(__file__).resolve().parent))
+from src.data_ingestion.universe import Universe
+from src.metrics.factors.core_factors import compute_fundamental_factors
 
 # So basically we are using ctypes.Structure to force oython to treat these variables exactly
 # like raw C data types (e.g. c_int32 = 4 bytes)
@@ -51,37 +57,56 @@ def main():
         # this tells the OS to map the file into memory
         # access=mmap.ACCESS_WRITE tells the OS that we want to write to the file
         
-        # mm is a python object containing 42004 raw meaningless bytes. 
+        # mm is a python object containing raw meaningless bytes. 
         # now if we want to use the members of the object like stock_id or factors,
         # we cannot use it directly on mm
         # so we are using this .from_buffer() method which tells python to treat the raw 
         # bytes from mm as SharedBlock struct and create a python object from it
         block = SharedBlock.from_buffer(mm)
 
-        # 5. Populate 50 test data rows!
+        # 5. Populate and stream real live data
         block.head = 0
         block.tail = 0
 
-        print("starting continuous data stream...press ctrl+c to stop")
+        # Load real universe data
+        print("Initializing stock universe...")
+        universe = Universe()
+        
+        # Taking top 50 strictly mapping to C++ array requirements (if needed) or iterating full universe
+        company_tickers = universe.all_tickers()[:50]
+        print(f"Loaded {len(company_tickers)} tickers to stream continuously...press ctrl+c to stop")
 
         try:
             while True:
-                while((block.head-block.tail)%(2**32)>=1024):
-                    time.sleep(0.001) # wait for 1 ms
-                
-                # write data
-                idx = block.head % 1024
+                # Iterate precisely through the tickers
+                for ticker in company_tickers:
+                    # Wait for space in ring buffer
+                    while((block.head - block.tail) % (2**32) >= 1024):
+                        time.sleep(0.001) # wait for 1 ms
+                    
+                    # Fetch real live computation
+                    try:
+                        print(f"Fetching updates for {ticker}...")
+                        calculated_factors = compute_fundamental_factors(ticker)
+                        
+                        # write data
+                        idx = block.head % 1024
+                        block.records[idx].stock_id = universe.get_id(ticker)
+                        
+                        for j in range(10):
+                            # Safe fallback in case of None logic internally
+                            val = calculated_factors[j]
+                            block.records[idx].factors[j] = val if val is not None else 0.0
 
-                block.records[idx].stock_id = random.randint(0, 499)
-                for j in range(10):
-                    block.records[idx].factors[j] = random.uniform(-1.0, 1.0)
+                        # atomically publish to the consumer by incrementing head
+                        block.head = (block.head + 1) % (2**32)
 
-                #atomically publish to the consumer by incrementing head
-                block.head = (block.head + 1) % (2**32)
+                    except Exception as e:
+                        print(f"Failed pulling variables for {ticker}: {e}")
 
-                #small sleep to simulate 100 updates per second
+                    # Respectful rate limiting so APIs don't permanently ban our IP 
+                    time.sleep(2.0)
 
-                time.sleep(0.01)
         except KeyboardInterrupt:
             print("\nProducer stopped by user.")    
         

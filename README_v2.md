@@ -209,7 +209,6 @@ Built as a collaborative quant research project by:
 - Somnath
 - Anvesh
 - Jaju
-- Shubham
 
 ---
 
